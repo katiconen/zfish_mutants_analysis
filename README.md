@@ -20,4 +20,4 @@ These three files are included by the above notebooks, and contain calculation, 
 * modelfit_plotfns.py
 
 **Data**<br>
-Data is available through Mendeley Data at [http://dx.doi.org/10.17632/wwbjbjyw93.1](http://dx.doi.org/10.17632/wwbjbjyw93.1)
+Data is available through Dryad at [http://doi.org/10.5061/dryad.hx3ffbg9n](http://doi.org/10.5061/dryad.hx3ffbg9n).
