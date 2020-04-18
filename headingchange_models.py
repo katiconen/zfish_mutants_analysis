@@ -3,7 +3,7 @@ import torch
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import scipy
-import datafunctions_v2 as dfunc
+import datafunctions as dfunc
 
 thetanumbins = 32
 theta_edge = np.linspace(-np.pi,np.pi,thetanumbins+1) 
