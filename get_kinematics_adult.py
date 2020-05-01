@@ -280,8 +280,10 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
           nbins = time steps before and after peak (or valley) for which speed must be incr/decr on average (to avoid mini-peaks)
           threshold = minimum peak speed,     burstHtthresh = minimum peak-valley difference
           twinsize and stepsize are nbins to average and slidingstepsize for calculating sliding burstrate
-    Consider making burstrate into separate fn time and bursts dataframe as inputs    '''
+    Consider making burstrate into separate fn time and bursts dataframe as inputs    
+    TO DO: add functionality for dealing with NaNs in speed'''
   
+    #baddata = np.isnan(speed) | np.isnan(time)
     peak = np.zeros(speed.shape[0],dtype=np.int8)     
     valley = np.zeros(speed.shape[0],dtype=np.int8)
     falsevalley = np.zeros(speed.shape[0],dtype=np.int8)
@@ -289,6 +291,7 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
     
     #can make more efficient, but for now "done is better than perfect
     for i in range(nbins,speed.shape[0]-nbins):
+        #if nan in range i-nbins:i+nbins, no peak, no valley, continue
         past = speed[i] - speed[i-nbins]
         future = speed[i+nbins] - speed[i]
         locMax = np.max(speed[i-nbins:i+nbins+1])
