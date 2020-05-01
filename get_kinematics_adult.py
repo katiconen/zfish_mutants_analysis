@@ -273,7 +273,7 @@ def quadratic(x, m, a, b):
     return m*x*x + a*x + b
 
 
-def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.0, twinsize = 1000, stepsize = 100):   #analyze BG cycle
+def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.0, twinsize = 600, stepsize = 60):   #analyze BG cycle
     '''
     Identifies burst-glide cycle peaks and valleys, gets fits for each burst, and finds a sliding burstrate across time
     vars: speed = input of speed at each timepoint across whole experiment; time = time at each step (defined as 0:0.01:speed.length if not inputed)
@@ -281,9 +281,11 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
           threshold = minimum peak speed,     burstHtthresh = minimum peak-valley difference
           twinsize and stepsize are nbins to average and slidingstepsize for calculating sliding burstrate
     Consider making burstrate into separate fn time and bursts dataframe as inputs    
-    TO DO: add functionality for dealing with NaNs in speed'''
+'''
   
-    #baddata = np.isnan(speed) | np.isnan(time)
+    if type(time) != np.ndarray:
+        time = np.arange(0.0,(pos.shape[0])/60,1/60)
+    
     peak = np.zeros(speed.shape[0],dtype=np.int8)     
     valley = np.zeros(speed.shape[0],dtype=np.int8)
     falsevalley = np.zeros(speed.shape[0],dtype=np.int8)
@@ -291,7 +293,8 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
     
     #can make more efficient, but for now "done is better than perfect
     for i in range(nbins,speed.shape[0]-nbins):
-        #if nan in range i-nbins:i+nbins, no peak, no valley, continue
+        if np.any(np.isnan(speed[i-nbins:i+nbins])):
+            continue
         past = speed[i] - speed[i-nbins]
         future = speed[i+nbins] - speed[i]
         locMax = np.max(speed[i-nbins:i+nbins+1])
@@ -347,21 +350,21 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
     bursts = bursts[bursts.burstHt > burstHtthresh] #rmv bursts that are too small or spuriously negative - careful with this, check that it's not rmv too much
     bursts.reset_index(drop = True,inplace = True) #reset index to remove gaps
     
+    #initialize variables for regression fits
     linfit = np.empty([bursts.shape[0],2])
     expfit = np.empty([bursts.shape[0],3])
-    quadrisefit = np.empty([bursts.shape[0],3])
+    quadrisefit = np.empty([bursts.shape[0],3])    
+    failed_fit = np.zeros(bursts.shape[0],dtype = bool)
+    popt_linear = np.zeros(2)
+    pcov_linear =  -np.ones([2,2])
+    popt_exp = np.zeros(3)
+    pcov_exp = -np.ones([3,3])
+    popt_quadrise = np.zeros(3)
+    pcov_quadrise = -np.ones([3,3])
     
-    xlin_all = np.array([])
-    ylin_all = np.array([])
-    xexp_all = np.array([])
-    yexp_all = np.array([])
-    failed_expfit = np.zeros(bursts.shape[0],dtype = np.int8)
-    
-    # fit 2 part fn to each BG: linear rise, expDecay fall 
-    #(change incr to quadr or sigmoid, as is not great fits) XXX
-    # maybe also change decr? so more likely to not have fit pblms?
-    # also find overall fit for all data pooled (and alignedat peak)
-    for i in range(20):#range(bursts.shape[0]):
+    # fit 2 part fn to each BG: linear or quadratic rise, expDecay fall 
+    # if exp fit does not converge, do quadratic fall instead
+    for i in range(bursts.shape[0]):
         tmin =  bursts.loc[i,'valleyTime']
         tpeak = bursts.loc[i,'peakTime']
         if i != bursts.shape[0]-1:
@@ -378,37 +381,49 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
         #set starting t to zero. should I fully normalize and then undo after?? might make fit easier XXX
         x_lin = x_lin - tpeak
         x_exp = x_exp - tpeak
+
+        if np.any(np.isnan(x_lin) | np.isnan(y_lin)):
+            popt_linear[:] = np.nan
+            pcov_linear[:] = np.nan
+            popt_quadrise[:] = np.nan
+            pcov_quadrise[:] = np.nan
+            failed_fit[i] = 1
+        else:
+            try:
+                popt_linear, pcov_linear = scipy.optimize.curve_fit(linear, x_lin, y_lin, p0=[.1, 0])
+            except(TypeError):
+                #print("peak ",i," has too few timepoints")
+                failed_fit[i] = 1
+                popt_linear[:] = np.nan
+                pcov_linear[:] = np.nan
+            try:
+                popt_quadrise,pcov_quadrise = scipy.optimize.curve_fit(quadratic,x_lin,y_lin,p0=[.1,.1,0])
+            except(TypeError):
+                #print("peak ",i," has too few timepoints")
+                failed_fit[i] = 1
+                popt_quadrise[:] = np.nan
+                pcov_quadrise[:] = np.nan
         
-#        xlin_all = np.hstack((xlin_all,x_lin))
-#        xexp_all = np.hstack((xexp_all,x_exp))
-#        ylin_all = np.hstack((ylin_all,y_lin))
-#        yexp_all = np.hstack((yexp_all,y_exp))
-    
-        popt_linear, pcov_linear = scipy.optimize.curve_fit(linear, x_lin, y_lin, p0=[.1, 0])
-        popt_quadrise,pcov_quadrise = scipy.optimize.curve_fit(quadratic,x_lin,y_lin,p0=[.1,.1,0])
-    
-        try:
-            popt_exp, pcov_exp = curve_fit(exponential, x_exp, y_exp, p0=(1, 10, 1)) 
-        except(TypeError):
-            pass
-            print("peak ",i," has too few timepoints")
-            failed_expfit = 1
+        if np.any(np.isnan(x_exp) | np.isnan(y_exp)):
             popt_exp[:] = np.nan
             pcov_exp[:] = np.nan
-        except: #if not too few timepoints but exponential does not converge, fit w quadratic instead
-            popt_exp, pcov_exp = curve_fit(quadratic, x_exp, y_exp, p0=(1, .1, 1)) #quadratic where exponential fails, keep track of index
-            failed_expfit = 1
+            failed_fit[i] = 1
+        else:
+            try:
+                popt_exp, pcov_exp = curve_fit(exponential, x_exp, y_exp, p0=(1, 10, 1)) 
+            except(TypeError):
+                #print("peak ",i," has too few timepoints")
+                failed_fit[i] = 1
+                popt_exp[:] = np.nan
+                pcov_exp[:] = np.nan
+            except: #if enough timepoints but exponential does not converge, fit w quadratic instead
+                popt_exp, pcov_exp = curve_fit(quadratic, x_exp, y_exp, p0=(1, .1, 1)) #quadratic where exponential fails, keep track of index
+                failed_fit[i] = 1
     
         linfit[i,:] = popt_linear
         expfit[i,:] = popt_exp
         quadrisefit[i,:] = popt_quadrise
-        
-#    #consider rmving outliers first
-#    popt_linpooled, pcov_linpooled = scipy.optimize.curve_fit(linear, xlin_all, ylin_all, p0=[0.01, 0])
-#    popt_quadpooled, pcov_quadpooled = scipy.optimize.curve_fit(quadratic,xlin_all,ylin_all, p0 = [0.1,0.1,0])
-#    popt_exppooled, pcov_exppooled = curve_fit(exponential, xexp_all, yexp_all, p0=(1, .01, 1)) #prb need to tweak starting pt
-#    #looks weird, this pooling may not work
-    
+
     # find BG frequency over session, & over time in sliding window 
     burstrate = pd.DataFrame(np.zeros([int((time.shape[0]-twinsize)/stepsize),3]), columns = ['burstrate','tstart','tend'])
     for i in range(burstrate.shape[0]):
@@ -426,6 +441,7 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
     bursts['expfit_A'] = expfit[:,0]
     bursts['expfit_C'] = expfit[:,1]
     bursts['expfit_D'] = expfit[:,2]
+    bursts['failed_fit'] = failed_fit
     return bursts, burstrate
 
 ''' for other analysis of BG cycle:
@@ -538,7 +554,7 @@ def runAll(pos, time = None, speed = None, ori = None, xyOnly = True ):
  #maybe later: add something to get pos xyz and time from loopbio csv output
  
     if type(time) != np.ndarray:
-        time = np.arange(0.0,(pos.shape[0])/100.0,.01)
+        time = np.arange(0.0,(pos.shape[0])/60,1/60)
     if type(speed) != np.ndarray:
         speed = getSpeed(pos, time = time)
     if type(ori) != np.ndarray:
