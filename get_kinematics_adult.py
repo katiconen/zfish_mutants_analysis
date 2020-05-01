@@ -273,7 +273,7 @@ def quadratic(x, m, a, b):
     return m*x*x + a*x + b
 
 
-def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.0, twinsize = 600, stepsize = 60):   #analyze BG cycle
+def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.0, twinsize = 600, stepsize = 60, exclnans = True):   #analyze BG cycle
     '''
     Identifies burst-glide cycle peaks and valleys, gets fits for each burst, and finds a sliding burstrate across time
     vars: speed = input of speed at each timepoint across whole experiment; time = time at each step (defined as 0:0.01:speed.length if not inputed)
@@ -325,15 +325,22 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
             aux = np.where(nvals)[0]
             falsepeak[peaktime[aux[1:]]] = 1
             peak[peaktime[aux[1:]]] = 0
-    npeaks = np.sum(peak)  
-    
+   
     #Burst = valley followed by peak; therefore ignore peak if not preceded by valley, and ignore valley if not followed by peak    
     while np.min(np.where(valley)[0]) > np.min(np.where(peak)[0]):
-        npeaks -= 1
         peak[np.min(np.where(peak)[0])] = 0
     while np.max(np.where(valley)[0]) > np.max(np.where(peak)[0]):
         valley[np.max(np.where(valley)[0])] = 0
         
+    if exclnans:
+        peaktime = np.where(peak)[0]
+        valtime = np.where(valley)[0]   
+        for i in range(peaktime.shape[0]):
+            if np.any(np.isnan(speed[valtime[i]:peaktime[i]])):
+                valley[valtime[i]] = 0
+                peak[peaktime[i]] = 0
+
+    npeaks= np.sum(peak)
     bursts = pd.DataFrame(np.zeros([npeaks, 5]),columns = ['n','valleyTime','peakTime','minSp','peakSp'])
     bursts['n'] = np.arange(npeaks)
     
