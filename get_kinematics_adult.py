@@ -273,7 +273,7 @@ def quadratic(x, m, a, b):
     return m*x*x + a*x + b
 
 
-def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.0, twinsize = 600, stepsize = 60, exclnans = True):   #analyze BG cycle
+def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.0, twinsize = 60, stepsize = 6, exclnans = True):   #analyze BG cycle
     '''
     Identifies burst-glide cycle peaks and valleys, gets fits for each burst, and finds a sliding burstrate across time
     vars: speed = input of speed at each timepoint across whole experiment; time = time at each step (defined as 0:0.01:speed.length if not inputed)
@@ -308,8 +308,8 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
     #if there are multiple valleys between peaks, only keep last valley
     peaktime = np.where(peak)[0]
     valtime = np.where(valley)[0]   
-    print(np.sum(valley))
-    print(np.sum(peak))
+#    print(np.sum(valley))
+#    print(np.sum(peak))
     for i in range(peaktime.shape[0]-1):
         aux = []
         nvals = np.multiply(valtime > peaktime[i], valtime < peaktime[i+1])        
@@ -327,8 +327,8 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
         peak[peaktime[peaktime>aux]] = 0
             
     valtime = np.where(valley)[0]
-    print(np.sum(valley))
-    print(np.sum(peak))
+#    print(np.sum(valley))
+#    print(np.sum(peak))
     #if there are multiple peaks between valleys, only keep first peak
     for i in range(valtime.shape[0]-1):
         aux = []
@@ -338,8 +338,8 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
             falsepeak[peaktime[aux[1:]]] = 1
             peak[peaktime[aux[1:]]] = 0
     
-    print(np.sum(valley))
-    print(np.sum(peak))
+#    print(np.sum(valley))
+#    print(np.sum(peak))
     #Burst = valley followed by peak; therefore ignore peak if not preceded by valley, and ignore valley if not followed by peak    
     while np.min(np.where(valley)[0]) > np.min(np.where(peak)[0]):
         peak[np.min(np.where(peak)[0])] = 0
@@ -347,8 +347,8 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
         valley[np.max(np.where(valley)[0])] = 0
     
     
-    print(np.sum(valley))
-    print(np.sum(peak))    
+#    print(np.sum(valley))
+#    print(np.sum(peak))    
     if exclnans:
         peaktime = np.where(peak)[0]
         valtime = np.where(valley)[0]   
@@ -358,10 +358,10 @@ def getBGcycle(speed, time = None, nbins= 8, threshold = 0.0, burstHtthresh = 0.
                 peak[peaktime[i]] = 0
 
     npeaks= np.sum(peak)
-    print(np.sum(valley))
-    print(np.sum(peak))
-    print(np.where(peak)[0])
-    print(np.where(valley)[0])    
+#    print(np.sum(valley))
+#    print(np.sum(peak))
+#    print(np.where(peak)[0])
+#    print(np.where(valley)[0])    
     
     bursts = pd.DataFrame(np.zeros([npeaks, 5]),columns = ['n','valleyTime','peakTime','minSp','peakSp'])
     bursts['n'] = np.arange(npeaks)
